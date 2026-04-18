@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1000232871603",
+    "project_id": "muslim-8c21a",
+    "storage_bucket": "muslim-8c21a.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1000232871603:android:44af7003192d8950a2f2c6",
+        "android_client_info": {
+          "package_name": "com.muslimsathi.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB-jsL6kQqpwiMnYZvGEec3r6cKwIVvzOY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

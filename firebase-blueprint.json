@@ -1,0 +1,416 @@
+{
+  "entities": {
+    "Post": {
+      "title": "Post",
+      "description": "A social media post",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "authorUid": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorAvatarUrl": { "type": "string" },
+        "authorUsername": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string" },
+        "location": { "type": "string" },
+        "ameenCount": { "type": "number" },
+        "reactionsCount": { "type": "number" },
+        "reportsCount": { "type": "number" },
+        "reports": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorUid", "authorName", "content", "createdAt"]
+    },
+    "Reaction": {
+      "title": "Reaction",
+      "description": "A reaction to a post",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string" },
+        "userUid": { "type": "string" },
+        "type": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["postId", "userUid", "type", "createdAt"]
+    },
+    "CommentReaction": {
+      "title": "CommentReaction",
+      "description": "A reaction to a comment",
+      "type": "object",
+      "properties": {
+        "commentId": { "type": "string" },
+        "userUid": { "type": "string" },
+        "type": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["commentId", "userUid", "type", "createdAt"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A comment on a post",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string" },
+        "parentCommentId": { "type": "string" },
+        "userUid": { "type": "string" },
+        "userName": { "type": "string" },
+        "userAvatarUrl": { "type": "string" },
+        "content": { "type": "string" },
+        "reactionsCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["postId", "userUid", "userName", "content", "createdAt"]
+    },
+    "Follow": {
+      "title": "Follow",
+      "description": "A follow relationship",
+      "type": "object",
+      "properties": {
+        "follower_id": { "type": "string" },
+        "following_id": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["follower_id", "following_id", "createdAt"]
+    },
+    "Report": {
+      "title": "Report",
+      "description": "A report on a post",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string" },
+        "userUid": { "type": "string" },
+        "reason": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["postId", "userUid", "reason", "createdAt"]
+    },
+    "BugReport": {
+      "title": "BugReport",
+      "description": "A bug report from a user",
+      "type": "object",
+      "properties": {
+        "userUid": { "type": "string" },
+        "userName": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "appVersion": { "type": "string" },
+        "deviceModel": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userUid", "title", "description", "createdAt"]
+    },
+    "SocialVideo": {
+      "title": "SocialVideo",
+      "description": "A video posted in social feed",
+      "type": "object",
+      "properties": {
+        "telegramFileId": { "type": "string" },
+        "title": { "type": "string" },
+        "visibility": { "type": "string" },
+        "authorUid": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorAvatar": { "type": "string" },
+        "likes": { "type": "number" },
+        "comments": { "type": "number" },
+        "shares": { "type": "number" },
+        "songName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "VideoLike": {
+      "title": "VideoLike",
+      "description": "A like on a video",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "videoId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "videoId", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A user profile",
+      "type": "object",
+      "properties": {
+        "location": { "type": "string" },
+        "displayName": { "type": "string" },
+        "displayNameLower": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "username": { "type": "string" },
+        "phoneNumber": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "client"] },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Ad": {
+      "title": "Ad",
+      "description": "An advertisement",
+      "type": "object",
+      "properties": {
+        "imageUrl": { "type": "string" },
+        "redirectLink": { "type": "string" },
+        "category": { "type": "string", "enum": ["home", "social", "all"] },
+        "type": { "type": "string", "enum": ["small", "large"] },
+        "active": { "type": "boolean" }
+      },
+      "required": ["imageUrl", "redirectLink", "category", "type", "active"]
+    },
+    "UserData": {
+      "title": "UserData",
+      "description": "User tracker data",
+      "type": "object",
+      "properties": {
+        "prayerTracker": { "type": "object" },
+        "favoriteDuas": { "type": "array", "items": { "type": "object" } },
+        "favoriteAyats": { "type": "array", "items": { "type": "object" } },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Story": {
+      "title": "Story",
+      "description": "A user story",
+      "type": "object",
+      "properties": {
+        "authorUid": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorAvatarUrl": { "type": "string" },
+        "text": { "type": "string" },
+        "backgroundColor": { "type": "string" },
+        "textStyle": { "type": "object" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["authorUid", "authorName", "text", "backgroundColor", "textStyle", "createdAt"]
+    },
+    "GlobalNotification": {
+      "title": "GlobalNotification",
+      "description": "A notification sent by admin to all users",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "body": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "link": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "body", "createdAt"]
+    },
+    "SocialSettings": {
+      "title": "SocialSettings",
+      "description": "Global social limits and settings",
+      "type": "object",
+      "properties": {
+        "postLimit": { "type": "number", "description": "Daily post limit per user. -1 for unlimited." },
+        "storyLimit": { "type": "number", "description": "Daily story limit per user. -1 for unlimited." }
+      },
+      "required": ["postLimit", "storyLimit"]
+    },
+    "UserDailyStats": {
+      "title": "UserDailyStats",
+      "description": "User's daily activity counts",
+      "type": "object",
+      "properties": {
+        "postCount": { "type": "number" },
+        "storyCount": { "type": "number" },
+        "lastUpdated": { "type": "string", "format": "date-time" }
+      },
+      "required": ["postCount", "storyCount", "lastUpdated"]
+    },
+    "OTP": {
+      "title": "OTP",
+      "description": "One-Time Password for password reset",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "code": { "type": "string" },
+        "expiresAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["email", "code", "expiresAt"]
+    },
+    "EarningSettings": {
+      "title": "EarningSettings",
+      "description": "Global settings for earning categories",
+      "type": "object",
+      "properties": {
+        "gmailPrice": { "type": "number" },
+        "gmailLimit": { "type": "number" },
+        "gmailRequiredPassword": { "type": "string" },
+        "facebookPrice": { "type": "number" },
+        "facebookLimit": { "type": "number" },
+        "facebookRequiredPassword": { "type": "string" },
+        "quizReward": { "type": "number" },
+        "quizQuestionsPerSession": { "type": "number" },
+        "quizBreakTimeMinutes": { "type": "number" },
+        "typingJobBonus": { "type": "number" },
+        "adViewReward": { "type": "number" },
+        "minWithdrawal": { "type": "number", "description": "Minimum amount required for withdrawal" },
+        "adsRequiredForVerification": { "type": "number", "description": "Number of ads required to verify account" }
+      },
+      "required": ["gmailPrice", "gmailLimit", "gmailRequiredPassword"]
+    },
+    "AccountVerification": {
+      "title": "AccountVerification",
+      "description": "User account verification status and progress",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "adsWatched": { "type": "number" },
+        "isVerified": { "type": "boolean" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "adsWatched", "isVerified", "updatedAt"]
+    },
+    "Deposit": {
+      "title": "Deposit",
+      "description": "User deposit request",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "method": { "type": "string", "enum": ["bkash", "nagad"] },
+        "amount": { "type": "number" },
+        "senderNumber": { "type": "string" },
+        "transactionId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "method", "amount", "senderNumber", "transactionId", "status", "createdAt"]
+    },
+    "Withdrawal": {
+      "title": "Withdrawal",
+      "description": "User withdrawal request",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "method": { "type": "string", "enum": ["bkash", "nagad"] },
+        "amount": { "type": "number" },
+        "phoneNumber": { "type": "string" },
+        "accountName": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "method", "amount", "phoneNumber", "accountName", "status", "createdAt"]
+    },
+    "UserBalance": {
+      "title": "UserBalance",
+      "description": "User's total earnings and balance",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "totalEarned": { "type": "number" },
+        "currentBalance": { "type": "number" },
+        "depositBalance": { "type": "number" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "totalEarned", "currentBalance", "updatedAt"]
+    },
+    "EarningHistory": {
+      "title": "EarningHistory",
+      "description": "A record of user's earning activity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string", "description": "Type of earning (e.g., 'gmail_sale', 'quiz', 'ad_view')" },
+        "amount": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "type", "amount", "status", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/earning_history/{historyId}": {
+      "schema": "EarningHistory",
+      "description": "User's earning history records"
+    },
+    "/settings/earning": {
+      "schema": "EarningSettings",
+      "description": "Global earning settings"
+    },
+    "/deposits/{depositId}": {
+      "schema": "Deposit",
+      "description": "Collection of user deposit requests"
+    },
+    "/withdrawals/{withdrawalId}": {
+      "schema": "Withdrawal",
+      "description": "Collection of user withdrawal requests"
+    },
+    "/user_balances/{userId}": {
+      "schema": "UserBalance",
+      "description": "User balance data"
+    },
+    "/account_verifications/{userId}": {
+      "schema": "AccountVerification",
+      "description": "User account verification status"
+    },
+    "/otps/{otpId}": {
+      "schema": "OTP",
+      "description": "Collection of OTP codes"
+    },
+    "/settings/social": {
+      "schema": "SocialSettings",
+      "description": "Global social settings"
+    },
+    "/users/{userId}/daily_stats/{dateStr}": {
+      "schema": "UserDailyStats",
+      "description": "User's daily activity counts"
+    },
+    "/posts/{postId}": {
+      "schema": "Post",
+      "description": "Collection of posts"
+    },
+    "/reactions/{reactionId}": {
+      "schema": "Reaction",
+      "description": "Collection of reactions"
+    },
+    "/comment_reactions/{reactionId}": {
+      "schema": "CommentReaction",
+      "description": "Collection of comment reactions"
+    },
+    "/comments/{commentId}": {
+      "schema": "Comment",
+      "description": "Collection of comments"
+    },
+    "/follows/{followId}": {
+      "schema": "Follow",
+      "description": "Collection of follows"
+    },
+    "/reports/{reportId}": {
+      "schema": "Report",
+      "description": "Collection of reports"
+    },
+    "/bug_reports/{reportId}": {
+      "schema": "BugReport",
+      "description": "Collection of bug reports"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Collection of users"
+    },
+    "/user_data/{userId}": {
+      "schema": "UserData",
+      "description": "Collection of user tracker data"
+    },
+    "/stories/{storyId}": {
+      "schema": "Story",
+      "description": "Collection of user stories"
+    },
+    "/global_notifications/{notificationId}": {
+      "schema": "GlobalNotification",
+      "description": "Collection of global notifications sent by admin"
+    },
+    "/social_videos/{videoId}": {
+      "schema": "SocialVideo",
+      "description": "Collection of social videos"
+    },
+    "/video_likes/{likeId}": {
+      "schema": "VideoLike",
+      "description": "Collection of video likes"
+    },
+    "/ads/{adId}": {
+      "schema": "Ad",
+      "description": "Collection of advertisements"
+    }
+  }
+}
