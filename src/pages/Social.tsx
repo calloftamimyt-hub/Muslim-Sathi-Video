@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ThumbsUp, Heart, MessageCircle, Share2, Music, Play, MoreVertical, Camera, X, UploadCloud, Loader2, Check, Trash2, AlertTriangle, Edit, ShieldAlert, ChevronLeft, PlayCircle, Video, User, Plus, BadgeCheck, Gift, Volume2, VolumeX } from 'lucide-react';
+import { ThumbsUp, Heart, MessageCircle, Share2, Music, Play, MoreVertical, Camera, X, UploadCloud, Loader2, Check, Trash2, AlertTriangle, Edit, ShieldAlert, ChevronLeft, PlayCircle, Video, User, Plus, BadgeCheck, Gift, Volume2, VolumeX, Image, RefreshCw, Scissors, ChevronRight, Eye, Globe, Users, Lock } from 'lucide-react';
 import { useLanguage } from '../contexts/LanguageContext';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
@@ -9,6 +9,7 @@ import { collection, addDoc, doc, getDoc, setDoc, deleteDoc, serverTimestamp, qu
 
 import { VerifiedBadge } from '@/components/VerifiedBadge';
 import { Capacitor } from '@capacitor/core';
+import { StatusBar, Style } from '@capacitor/status-bar';
 import { showRewardedAd, showInterstitialAd } from '../lib/admob';
 
 const getApiBase = () => {
@@ -20,7 +21,7 @@ const getApiBase = () => {
 
   // Fallback for native/Capacitor: If no env var, use a default working one or current origin
   if (Capacitor.isNativePlatform()) {
-    return 'https://ais-dev-47x2krhcb7hnr5enczfekd-107332946958.asia-east1.run.app';
+    return 'https://muslim-sathi-video.onrender.com';
   }
   
   // On web, just use relative paths
@@ -889,9 +890,15 @@ const UserProfileView: React.FC<{ userId: string, onClose: () => void, onEditVid
                     </div>
                   )}
 
-                  <div className="absolute bottom-1 left-2 flex items-center gap-1 text-white text-[10px] font-bold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
-                    <Play className="w-3 h-3 fill-white" />
-                    <span>{video.likes || 0}</span>
+                  <div className="absolute bottom-1 left-2 right-2 flex items-center justify-between pointer-events-none">
+                    <div className="flex items-center gap-1 text-white text-[9px] font-bold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                      <ThumbsUp className="w-2.5 h-2.5 fill-white" />
+                      <span>{video.likes || 0}</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-white text-[9px] font-bold drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                      <Eye className="w-2.5 h-2.5 text-white/90" />
+                      <span>{formatViews(video.views || 0)}</span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -901,6 +908,12 @@ const UserProfileView: React.FC<{ userId: string, onClose: () => void, onEditVid
       </div>
     </motion.div>
   );
+};
+
+const formatViews = (views: number) => {
+  if (views >= 1000000) return `${(views / 1000000).toFixed(1)}M`;
+  if (views >= 1000) return `${(views / 1000).toFixed(1)}K`;
+  return views.toString();
 };
 
 const VideoPost: React.FC<{ 
@@ -925,11 +938,15 @@ const VideoPost: React.FC<{
   const [isFollowed, setIsFollowed] = useState(false);
   const [authorProfile, setAuthorProfile] = useState<{ photoURL?: string, displayName?: string, isVerified?: boolean } | null>(null);
   const [watchProgress, setWatchProgress] = useState(0);
+  const [isFullyWatched, setIsFullyWatched] = useState(false);
   const hasFinishedRef = useRef(false);
+  const hasViewedRef = useRef(false);
 
   // Reset finished flag when video changes or restarts
   useEffect(() => {
     hasFinishedRef.current = false;
+    hasViewedRef.current = false;
+    setIsFullyWatched(false);
     setWatchProgress(0);
   }, [video.id]);
 
@@ -938,9 +955,27 @@ const VideoPost: React.FC<{
       const current = videoRef.current.currentTime;
       const total = videoRef.current.duration;
       if (!isNaN(total) && total > 0) {
-        setWatchProgress((current / total) * 100);
-        if (!hasFinishedRef.current && current / total >= 0.95) {
+        const progress = (current / total) * 100;
+        
+        // If not already fully watched, update progress normally
+        if (!isFullyWatched) {
+          setWatchProgress(progress);
+        }
+
+        // View counting logic: Count after 2 seconds or 20% watched
+        if (!hasViewedRef.current && (current >= 2 || progress >= 20)) {
+          hasViewedRef.current = true;
+          const videoRefDoc = doc(db, 'social_videos', video.id);
+          updateDoc(videoRefDoc, {
+            views: increment(1)
+          }).catch(err => console.error("Error updating views:", err));
+        }
+
+        // Completion logic
+        if (!hasFinishedRef.current && progress >= 95) {
           hasFinishedRef.current = true;
+          setIsFullyWatched(true);
+          setWatchProgress(100); // Lock it at 100%
           onVideoFinished(video.id);
         }
       }
@@ -959,11 +994,20 @@ const VideoPost: React.FC<{
     if (!videoElem) return;
 
     if (isActive && !isPaused) {
-      playPromiseRef.current = videoElem.play() as Promise<void> | undefined || null;
-      if (playPromiseRef.current !== null) {
-        playPromiseRef.current.catch(e => console.log('Autoplay prevented:', e));
-      }
-      setIsPlaying(true);
+      const playVideo = async () => {
+        try {
+          if (videoElem.paused) {
+            playPromiseRef.current = videoElem.play() as Promise<void> | undefined || null;
+            await playPromiseRef.current;
+            setIsPlaying(true);
+          }
+        } catch (e) {
+          console.log('Autoplay prevented:', e);
+          setIsPlaying(false);
+          // If unmuted play fails, we might still be paused
+        }
+      };
+      playVideo();
     } else {
       if (playPromiseRef.current !== null) {
         playPromiseRef.current.then(() => {
@@ -1163,54 +1207,40 @@ const VideoPost: React.FC<{
   };
 
   // Sync avatar with author profile or fallback to cached video metadata
-  const avatarSrc = authorProfile?.photoURL || video.authorAvatar;
+  const avatarSrc = (authorProfile?.photoURL || video.authorAvatar) || null;
   const displayName = authorProfile?.displayName || video.authorName || '@user';
 
   return (
     <div className="relative w-full h-full snap-start snap-always bg-black overflow-hidden flex-shrink-0">
-      <video
-        ref={videoRef}
-        src={video.src}
-        className="w-full h-full object-cover"
-        loop
-        muted={isMuted}
-        playsInline
-        webkit-playsinline="true"
-        referrerPolicy="no-referrer"
-        crossOrigin="anonymous"
-        preload="auto"
-        onClick={togglePlay}
-        onTimeUpdate={handleTimeUpdate}
-        onEnded={handleVideoEnded}
-        onError={(e) => {
-          console.error("Video load error:", e);
-          const target = e.target as HTMLVideoElement;
-          // Retry logic: sometimes a simple reload helps with network flakes
-          if (target.src) {
-            const currentSrc = target.src;
-            target.src = '';
-            setTimeout(() => {
-              target.src = currentSrc;
-            }, 1000);
-          }
-        }}
-      />
+      {video.src && (
+        <video
+          ref={videoRef}
+          src={video.src}
+          className="w-full h-full object-cover"
+          loop
+          muted={isMuted}
+          autoPlay={isActive}
+          playsInline
+          webkit-playsinline="true"
+          referrerPolicy="no-referrer"
+          crossOrigin="anonymous"
+          preload={isActive ? "auto" : "metadata"}
+          onClick={togglePlay}
+          onCanPlay={() => {
+            if (isActive && !isPaused) {
+              videoRef.current?.play().catch((e) => {
+                console.log("onCanPlay play failed:", e);
+              });
+            }
+          }}
+          onTimeUpdate={handleTimeUpdate}
+          onEnded={handleVideoEnded}
+          onError={(e) => {
+            console.error("Video load error:", e);
+          }}
+        />
+      )}
 
-      {/* Volume Control Overlay */}
-      <button 
-        onClick={(e) => {
-          e.stopPropagation();
-          onToggleMute?.();
-        }}
-        className="absolute top-20 right-4 z-40 bg-black/30 backdrop-blur-md p-2 rounded-full border border-white/10 active:scale-90 transition-all"
-      >
-        {isMuted ? (
-          <VolumeX className="w-5 h-5 text-white" />
-        ) : (
-          <Volume2 className="w-5 h-5 text-white" />
-        )}
-      </button>
-      
       {/* Play Button Overlay */}
       <AnimatePresence>
         {!isPlaying && (
@@ -1347,7 +1377,7 @@ const VideoPost: React.FC<{
 
       {/* Bottom Info Info */}
       <div className="absolute left-4 bottom-[10px] right-16 pb-safe z-10 flex flex-col gap-2 pointer-events-none">
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 flex-wrap">
           <h3 className="text-white font-bold text-[16px] drop-shadow-md">{displayName}</h3>
           <VerifiedBadge isVerified={authorProfile?.isVerified} isOwner={auth.currentUser?.uid === video.authorUid} size={16} />
         </div>
@@ -1364,14 +1394,370 @@ const VideoPost: React.FC<{
   );
 };
 
-const UploadModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
-  const [file, setFile] = useState<File | null>(null);
+const CameraModal: React.FC<{ onClose: () => void, onCapture: (file: File) => void }> = ({ onClose, onCapture }) => {
+  const [stream, setStream] = useState<MediaStream | null>(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const galleryRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    startCamera();
+    
+    // Hardware Back Button Support for closing camera
+    window.history.pushState({ cameraOpen: true }, '');
+    const handlePopState = () => onClose();
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      stream?.getTracks().forEach(track => track.stop());
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [facingMode]);
+
+  const startCamera = async () => {
+    try {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+      
+      let newStream;
+      try {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode },
+          audio: true
+        });
+      } catch (e) {
+        newStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode },
+          audio: false
+        });
+      }
+      
+      setStream(newStream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = newStream;
+      }
+    } catch (err) {
+      console.error("Camera access error:", err);
+      alert("Camera error: " + (err instanceof Error ? err.message : String(err)));
+      onClose();
+    }
+  };
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      mediaRecorderRef.current?.stop();
+    } else {
+      if (!stream) return;
+      chunksRef.current = [];
+      const recorder = new MediaRecorder(stream);
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: 'video/mp4' });
+        const file = new File([blob], `recorded_video_${Date.now()}.mp4`, { type: 'video/mp4' });
+        onCapture(file);
+      };
+      recorder.start();
+      mediaRecorderRef.current = recorder;
+      setIsRecording(true);
+    }
+  };
+
+  const handleGalleryPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files?.[0]) {
+      onCapture(e.target.files[0]);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black z-[1200] flex flex-col pt-safe">
+      <video 
+        ref={videoRef} 
+        autoPlay 
+        playsInline 
+        muted 
+        className="flex-1 w-full h-full object-cover"
+      />
+      
+      {/* Controls Overlay */}
+      <div className="absolute inset-x-0 bottom-0 pb-16 px-6 pointer-events-none">
+        <div className="flex items-center justify-between pointer-events-auto max-w-sm mx-auto">
+          {/* Gallery Button - Left */}
+          <div className="flex flex-col items-center">
+            <button 
+              onClick={() => galleryRef.current?.click()}
+              className="w-14 h-14 flex items-center justify-center text-white active:scale-95 transition-all drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]"
+            >
+              <Image className="w-9 h-9" />
+            </button>
+            <input 
+              type="file" 
+              accept="video/*" 
+              ref={galleryRef} 
+              className="hidden" 
+              onChange={handleGalleryPick} 
+            />
+          </div>
+
+          {/* Record Button - Center */}
+          <button 
+            onClick={toggleRecording}
+            className={cn(
+              "w-22 h-22 rounded-full border-4 flex items-center justify-center transition-all active:scale-90",
+              isRecording ? "border-rose-500" : "border-white"
+            )}
+          >
+            <div className={cn(
+              "transition-all duration-300",
+              isRecording ? "w-10 h-10 rounded-md bg-rose-500 shadow-[0_0_20px_rgba(244,63,94,0.6)]" : "w-18 h-18 rounded-full bg-white shadow-lg"
+            )} />
+          </button>
+
+          {/* Flip Button - Right */}
+          <div className="flex flex-col items-center">
+            <button 
+              onClick={() => setFacingMode(prev => prev === 'user' ? 'environment' : 'user')} 
+              className="w-14 h-14 flex items-center justify-center text-white active:scale-95 transition-all drop-shadow-[0_2px_8px_rgba(0,0,0,0.6)]"
+            >
+              <RefreshCw className="w-8 h-8" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const VideoEditModal: React.FC<{ file: File, onClose: () => void, onComplete: (file: File) => void }> = ({ file, onClose, onComplete }) => {
+  const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [duration, setDuration] = useState(0);
+  const [startTime, setStartTime] = useState(0);
+  const [endTime, setEndTime] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [thumbnails, setThumbnails] = useState<string[]>([]);
+
+  useEffect(() => {
+    const url = URL.createObjectURL(file);
+    setVideoUrl(url);
+    
+    // Hardware Back Button Support
+    window.history.pushState({ editOpen: true }, '');
+    const handlePopState = () => onClose();
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      URL.revokeObjectURL(url);
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [file]);
+
+  const generateThumbnails = async (video: HTMLVideoElement) => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const d = video.duration;
+    const thumbs: string[] = [];
+    const count = 8; // Number of thumbnails to show
+
+    canvas.width = 160;
+    canvas.height = 90;
+
+    for (let i = 0; i < count; i++) {
+      const time = (d / count) * i;
+      video.currentTime = time;
+      await new Promise(r => {
+        const onSeeked = () => {
+          ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+          thumbs.push(canvas.toDataURL('image/jpeg', 0.5));
+          video.removeEventListener('seeked', onSeeked);
+          r(null);
+        };
+        video.addEventListener('seeked', onSeeked);
+      });
+    }
+    setThumbnails(thumbs);
+    video.currentTime = 0; // Reset to start
+  };
+
+  const onLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget;
+    const d = video.duration;
+    setDuration(d);
+    setEndTime(d);
+    generateThumbnails(video);
+  };
+
+  const handleTimeUpdate = () => {
+    if (videoRef.current) {
+      setCurrentTime(videoRef.current.currentTime);
+      if (videoRef.current.currentTime >= endTime) {
+        videoRef.current.currentTime = startTime;
+      }
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black z-[1300] flex flex-col">
+      {/* Header - Stays below Status Bar */}
+      <div className="pt-safe bg-black/40 backdrop-blur-md border-b border-white/5">
+        <div className="h-16 px-4 flex justify-between items-center">
+          <button 
+            onClick={onClose} 
+            className="p-2 text-white/80 hover:text-white active:scale-90 transition-all"
+          >
+            <ChevronLeft className="w-8 h-8" />
+          </button>
+          
+          <h2 className="text-white font-bold text-lg">Edit Video</h2>
+
+          <button 
+            onClick={() => onComplete(file)} 
+            className="bg-primary text-white px-6 py-2 rounded-full font-bold flex items-center gap-2 shadow-lg shadow-primary/20 active:scale-95 transition-all text-sm"
+          >
+            Next
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Preview Area */}
+      <div className="flex-1 flex flex-col justify-center bg-black overflow-hidden relative">
+        {videoUrl && (
+          <video 
+            ref={videoRef}
+            src={videoUrl}
+            onLoadedMetadata={onLoadedMetadata}
+            onTimeUpdate={handleTimeUpdate}
+            className="w-full h-full object-contain"
+            playsInline
+            autoPlay
+            muted
+            loop
+          />
+        )}
+        
+        {/* Playback Progress Bar */}
+        <div className="absolute bottom-0 left-0 right-0 h-1 bg-white/10">
+          <div 
+            className="h-full bg-primary transition-all duration-100"
+            style={{ width: `${(currentTime / duration) * 100}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Trimmer UI - Stays above navigation bar */}
+      <div className="bg-slate-950/80 backdrop-blur-xl border-t border-white/5 p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-8 h-8 bg-primary/20 rounded-lg flex items-center justify-center">
+            <Scissors className="w-4 h-4 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-white font-bold text-sm">Trim Duration</h3>
+            <p className="text-[10px] text-white/40">Drag handles to adjust length</p>
+          </div>
+        </div>
+        
+        <div className="relative h-14 bg-white/5 rounded-xl overflow-hidden border border-white/10 ring-1 ring-white/10 shadow-inner">
+          {/* Visual Timeline / Thumbnails */}
+          <div className="absolute inset-0 flex items-center justify-between opacity-40 pointer-events-none">
+            {thumbnails.length > 0 ? (
+              thumbnails.map((src, i) => (
+                <img key={i} src={src} alt="" className="h-full w-full object-cover border-r border-white/5 last:border-r-0" />
+              ))
+            ) : (
+              [...Array(8)].map((_, i) => (
+                <div key={i} className="flex-1 h-full bg-white/5 border-r border-white/5 last:border-r-0" />
+              ))
+            )}
+          </div>
+
+          {/* Active Range Overlay */}
+          <div 
+            className="absolute h-full bg-primary/20 border-x-4 border-primary z-10"
+            style={{ 
+              left: `${(startTime / duration) * 100}%`, 
+              right: `${100 - (endTime / duration) * 100}%` 
+            }}
+          >
+            {/* Range Handles Visuals */}
+            <div className="absolute inset-y-0 -left-1 w-2 flex items-center justify-center">
+              <div className="w-1 h-8 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.5)]" />
+            </div>
+            <div className="absolute inset-y-0 -right-1 w-2 flex items-center justify-center">
+              <div className="w-1 h-8 bg-white rounded-full shadow-[0_0_8px_rgba(255,255,255,0.5)]" />
+            </div>
+          </div>
+          
+          <input 
+            type="range" 
+            min="0" 
+            max={duration} 
+            step="0.1"
+            value={startTime}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              setStartTime(Math.min(val, endTime - 0.5));
+              if (videoRef.current) videoRef.current.currentTime = val;
+            }}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-30"
+          />
+          <input 
+            type="range" 
+            min="0" 
+            max={duration} 
+            step="0.1"
+            value={endTime}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              setEndTime(Math.max(val, startTime + 0.5));
+              if (videoRef.current) videoRef.current.currentTime = val;
+            }}
+            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-40"
+          />
+        </div>
+        
+        <div className="flex justify-between items-center mt-4">
+          <div className="px-3 py-1 bg-white/5 rounded-full border border-white/10">
+            <span className="text-[10px] text-white/70 font-mono">{startTime.toFixed(1)}s</span>
+          </div>
+          
+          <div className="flex flex-col items-center">
+            <span className="text-[10px] text-primary font-bold uppercase tracking-widest">Selected</span>
+            <span className="text-sm text-white font-bold font-mono">{(endTime - startTime).toFixed(1)}s</span>
+          </div>
+          
+          <div className="px-3 py-1 bg-white/5 rounded-full border border-white/10">
+            <span className="text-[10px] text-white/70 font-mono">{endTime.toFixed(1)}s</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const UploadModal: React.FC<{ onClose: () => void, initialFile?: File }> = ({ onClose, initialFile }) => {
+  const [file, setFile] = useState<File | null>(initialFile || null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [visibility, setVisibility] = useState('public');
   const [allowComments, setAllowComments] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+
+  const [showFullscreenPreview, setShowFullscreenPreview] = useState(false);
+  const [showVisibilityDropdown, setShowVisibilityDropdown] = useState(false);
+  const [showCommentDropdown, setShowCommentDropdown] = useState(false);
+
+  useEffect(() => {
+    if (initialFile) {
+      setPreviewUrl(URL.createObjectURL(initialFile));
+    }
+  }, [initialFile]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -1382,15 +1768,26 @@ const UploadModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     }
   };
 
+  const handleTitleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const val = e.target.value;
+    if (val.length <= 20) {
+      setTitle(val);
+    }
+  };
+
   useEffect(() => {
     // 1. Hardware Back Button Support
     window.history.pushState({ uploadOpen: true }, '');
     const handlePopState = () => onClose();
     window.addEventListener('popstate', handlePopState);
 
+    // Hide Bottom Nav
+    window.dispatchEvent(new CustomEvent('hide-nav', { detail: true }));
+
     return () => {
       window.removeEventListener('popstate', handlePopState);
       if (previewUrl) URL.revokeObjectURL(previewUrl);
+      window.dispatchEvent(new CustomEvent('hide-nav', { detail: false }));
     };
   }, [previewUrl]);
 
@@ -1414,9 +1811,9 @@ const UploadModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         throw new Error('You must be logged in to upload a video.');
       }
 
-      // Check Daily Upload Limit
+      // Check Daily Upload Limit (Increased for testing)
       const settingsDoc = await getDoc(doc(db, 'settings', 'social'));
-      const dailyUploadLimit = settingsDoc.exists() ? settingsDoc.data()?.dailyUploadLimit || 5 : 5;
+      const dailyUploadLimit = settingsDoc.exists() ? settingsDoc.data()?.dailyUploadLimit || 100 : 100;
 
       // Get user's uploads for today
       const today = new Date();
@@ -1424,12 +1821,19 @@ const UploadModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       
       const userVideosQuery = query(
         collection(db, 'social_videos'),
-        where('authorUid', '==', currentUser.uid),
-        where('createdAt', '>=', today)
+        where('authorUid', '==', currentUser.uid)
       );
       
       const userVideosSnap = await getDocs(userVideosQuery);
-      if (userVideosSnap.size >= dailyUploadLimit) {
+      const todaysVideos = userVideosSnap.docs.filter(doc => {
+        const data = doc.data();
+        if (!data.createdAt) return false;
+        // Handle both Firestore Timestamp and JS Date
+        const createdAt = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt);
+        return createdAt >= today;
+      });
+
+      if (todaysVideos.length >= dailyUploadLimit) {
         throw new Error(`You have reached your daily limit of ${dailyUploadLimit} video uploads.`);
       }
 
@@ -1469,9 +1873,10 @@ const UploadModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
       }
 
       const telegramFileId = tgData.result.video.file_id;
+      const messageId = tgData.result.message_id;
 
-      // 2. Save metadata to Firestore directly from client
-      await addDoc(collection(db, 'social_videos'), {
+      // 2. Save metadata to Firestore with PENDING status
+      const videoDocRef = await addDoc(collection(db, 'social_videos'), {
         telegramFileId,
         title,
         visibility,
@@ -1484,13 +1889,36 @@ const UploadModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         shares: 0,
         createdAt: serverTimestamp(),
         songName: 'Original Sound',
+        status: 'pending', 
+      });
+
+      const videoId = videoDocRef.id;
+
+      // 3. Add Approve/Reject buttons to the Telegram message
+      const replyMarkup = {
+        inline_keyboard: [
+          [
+            { text: "✅ Approve", callback_data: `approve_${videoId}` },
+            { text: "❌ Reject", callback_data: `reject_${videoId}` }
+          ]
+        ]
+      };
+
+      await fetch(`https://api.telegram.org/bot${botToken}/editMessageReplyMarkup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: replyMarkup
+        })
       });
 
       if (progressInterval) clearInterval(progressInterval);
       setProgress(100);
 
       setTimeout(() => {
-        alert('Video uploaded successfully!');
+        alert('ভিডিওটি আপলোড হয়েছে এবং অ্যাডমিনের প্যানেলে পাঠানো হয়েছে। অ্যাপ্রুভ হওয়ার পর এটি সোশ্যাল ফিডে দেখা যাবে।');
         onClose();
       }, 500);
     } catch (error: any) {
@@ -1503,159 +1931,307 @@ const UploadModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     }
   };
 
+  const wordCount = title.trim().split(/\s+/).filter(w => w.length > 0).length;
+  const charCount = title.length;
+
   return (
-    <div className="absolute inset-0 bg-white z-[600] flex flex-col pt-safe">
-      <div className="flex items-center justify-between px-5 pt-3 pb-3 border-b border-slate-100">
-        <button onClick={onClose} className="p-1 -ml-2 text-slate-900 active:scale-90 transition-all">
+    <div className="fixed inset-0 bg-white z-[2000] flex flex-col pt-safe select-none overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-slate-100">
+        <button onClick={onClose} className="p-2 -ml-2 text-slate-900 active:scale-95 transition-all outline-none">
           <ChevronLeft className="w-6 h-6" />
         </button>
-        <h2 className="text-slate-900 font-extrabold text-lg tracking-tight">Upload Video</h2>
-        <button 
-          onClick={handleUpload}
-          disabled={uploading || !file}
-          className="text-primary font-bold active:scale-95 disabled:opacity-50 transition-all py-1 px-3"
-        >
-          {uploading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Post'}
-        </button>
+        <h2 className="text-slate-900 font-bold text-[17px]">Post</h2>
+        <div className="w-10" /> {/* Spacer */}
       </div>
       
-      <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-5 hide-scrollbar pt-4">
-        {/* Preview Card */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl overflow-hidden p-1">
-          <div className="border border-dashed border-slate-200 rounded-[12px] overflow-hidden min-h-[180px] flex flex-col items-center justify-center text-center bg-white relative group transition-all">
-            {previewUrl ? (
-              <div className="w-full h-full relative aspect-video flex items-center justify-center bg-black rounded-[12px] overflow-hidden">
+      <div className="flex-1 overflow-y-auto hide-scrollbar relative">
+        {!previewUrl ? (
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-slate-50/50">
+            <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-6 shadow-xl border-4 border-white">
+              <Camera className="w-10 h-10" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">Create a video</h3>
+            <p className="text-slate-500 text-sm mb-8 max-w-[200px]">Post videos to connect with your community</p>
+            
+            <div className="flex flex-col gap-3 w-full max-w-xs">
+              <input 
+                type="file" 
+                accept="video/*" 
+                className="hidden" 
+                id="gallery-picker-main"
+                onChange={handleFileChange}
+                disabled={uploading}
+              />
+              <label 
+                htmlFor="gallery-picker-main" 
+                className="flex items-center justify-center gap-3 w-full py-4 bg-primary text-white rounded-lg font-bold shadow-lg shadow-primary/20 active:scale-95 transition-all cursor-pointer"
+              >
+                <Plus className="w-5 h-5" />
+                Select Video
+              </label>
+              
+              <input 
+                type="file" 
+                accept="video/*" 
+                capture="environment"
+                className="hidden" 
+                id="camera-picker-main"
+                onChange={handleFileChange}
+                disabled={uploading}
+              />
+              <label 
+                htmlFor="camera-picker-main" 
+                className="flex items-center justify-center gap-3 w-full py-4 bg-white text-primary border-2 border-primary/20 rounded-lg font-bold active:scale-95 transition-all cursor-pointer"
+              >
+                <Camera className="w-5 h-5" />
+                Record Now
+              </label>
+
+              <p className="mt-4 text-[10px] text-slate-400 font-medium">MP4, WebM (Maximum 25MB)</p>
+            </div>
+          </div>
+        ) : (
+          <div className="p-4 flex flex-col gap-4">
+            {/* Top Section: Caption + Preview */}
+            <div className="flex gap-4 items-start min-h-[140px]">
+              <div className="flex-1 flex flex-col">
+                <textarea 
+                  value={title}
+                  onChange={handleTitleChange}
+                  disabled={uploading}
+                  placeholder="Describe your video... (Max 20 chars)"
+                  className="w-full bg-transparent border-none text-slate-900 placeholder-slate-400 focus:outline-none transition-all resize-none h-[100px] text-[15px] font-normal leading-relaxed"
+                />
+                <div className={cn(
+                  "text-[11px] font-bold self-end mt-1",
+                  charCount >= 20 ? "text-rose-500" : "text-slate-400"
+                )}>
+                  {charCount}/20 Characters
+                </div>
+              </div>
+              
+              <div 
+                className="w-28 aspect-[9/16] bg-black rounded-lg overflow-hidden relative shadow-lg ring-1 ring-black/5 group flex-shrink-0 cursor-pointer"
+                onClick={() => setShowFullscreenPreview(true)}
+              >
                 <video 
                   src={previewUrl} 
-                  className="w-full h-full object-contain" 
-                  controls 
+                  className="w-full h-full object-cover" 
                   playsInline
+                  autoPlay
+                  muted
+                  loop
                 />
-                {!uploading && (
-                  <label 
-                    htmlFor="video-upload" 
-                    className="absolute top-2 right-2 bg-black/60 hover:bg-black text-white px-3 py-1.5 rounded-lg font-medium text-xs backdrop-blur-md transition-all cursor-pointer opacity-0 group-hover:opacity-100"
-                  >
-                    Change
-                  </label>
-                )}
+                <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-center transition-opacity">
+                  <Eye className="w-5 h-5 text-white/80" />
+                  <span className="text-white text-[8px] font-bold mt-1 uppercase">Preview</span>
+                </div>
               </div>
-            ) : (
-              <div className="p-6 flex flex-col items-center">
-                <UploadCloud className="w-10 h-10 text-slate-300 mb-3" />
-                <span className="text-sm text-slate-900 font-bold mb-1">
-                  Select a video
-                </span>
-                <span className="text-[10px] text-slate-500 mb-4 max-w-[150px]">
-                  MP4 or WebM (Max 25MB)
-                </span>
-                <input 
-                  type="file" 
-                  accept="video/mp4,video/webm" 
-                  className="hidden" 
-                  id="video-upload"
-                  onChange={handleFileChange}
-                  disabled={uploading}
-                />
-                <label 
-                  htmlFor="video-upload" 
-                  className="bg-primary hover:bg-primary-dark text-white px-6 py-2 rounded-xl font-bold text-xs transition-all shadow-lg cursor-pointer active:scale-95"
+            </div>
+
+            {/* Divider */}
+            <div className="h-[1px] bg-slate-100 -mx-4" />
+
+            {/* Rows Settings */}
+            <div className="flex flex-col gap-2">
+              {/* Privacy Dropdown */}
+              <div className="relative">
+                <div 
+                  onClick={() => setShowVisibilityDropdown(!showVisibilityDropdown)}
+                  className="flex items-center justify-between py-4 group active:bg-slate-50 transition-colors -mx-4 px-4 rounded-xl cursor-pointer"
                 >
-                  Choose File
-                </label>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Description Card */}
-        <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
-          <label className="block text-xs font-bold text-slate-500 mb-2 uppercase tracking-wider px-1">Caption</label>
-          <textarea 
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            disabled={uploading}
-            placeholder="Tell us about this video... #islam #peace"
-            className="w-full bg-white border border-slate-200 rounded-xl p-3 text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none h-24 text-sm font-medium"
-          />
-        </div>
-
-        {/* Settings Card */}
-        <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-5">
-           {/* Visibility */}
-          <div>
-            <label className="block text-xs font-bold text-slate-500 mb-3 uppercase tracking-wider px-1">Privacy</label>
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { id: 'public', label: 'Everyone' },
-                { id: 'friends', label: 'Friends' },
-                { id: 'private', label: 'Only me' }
-              ].map((option) => (
-                <label 
-                  key={option.id}
-                  className={cn(
-                    "flex flex-col items-center justify-center p-3 rounded-xl border transition-all cursor-pointer",
-                    visibility === option.id 
-                      ? 'bg-primary/5 border-primary text-primary shadow-sm' 
-                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                  <div className="flex items-center gap-3">
+                    <div className="text-slate-600">
+                      <Globe className="w-5 h-5" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[15px] font-medium text-slate-900">Visibility</span>
+                      <span className="text-[13px] text-slate-500 capitalize">
+                        {visibility === 'public' ? 'Everyone' : visibility === 'friends' ? 'Followers' : 'Only Me'}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronRight className={cn("w-5 h-5 text-slate-400 transition-transform", showVisibilityDropdown && "rotate-90")} />
+                </div>
+                <AnimatePresence>
+                  {showVisibilityDropdown && (
+                    <motion.div 
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden bg-slate-50 rounded-xl"
+                    >
+                      {[
+                        { id: 'public', label: 'Everyone', icon: <Globe className="w-4 h-4" /> },
+                        { id: 'friends', label: 'Followers', icon: <Users className="w-4 h-4" /> },
+                        { id: 'private', label: 'Only Me', icon: <Lock className="w-4 h-4" /> }
+                      ].map((v) => (
+                        <div 
+                          key={v.id}
+                          onClick={() => { setVisibility(v.id); setShowVisibilityDropdown(false); }}
+                          className={cn(
+                            "flex items-center gap-3 p-4 border-b border-white/50 active:bg-slate-200 transition-all",
+                            visibility === v.id ? "text-primary font-bold bg-primary/5" : "text-slate-600"
+                          )}
+                        >
+                          {v.icon}
+                          <span className="text-sm">{v.label}</span>
+                          {visibility === v.id && <Check className="w-4 h-4 ml-auto" />}
+                        </div>
+                      ))}
+                    </motion.div>
                   )}
+                </AnimatePresence>
+              </div>
+
+              {/* Comments Dropdown */}
+              <div className="relative">
+                <div 
+                  onClick={() => setShowCommentDropdown(!showCommentDropdown)}
+                  className="flex items-center justify-between py-4 group active:bg-slate-50 transition-colors -mx-4 px-4 rounded-xl cursor-pointer"
                 >
-                  <input 
-                    type="radio" 
-                    name="visibility" 
-                    value={option.id} 
-                    checked={visibility === option.id}
-                    onChange={(e) => setVisibility(e.target.value)}
-                    disabled={uploading}
-                    className="hidden" 
-                  />
-                  <span className={cn("text-xs transition-all", visibility === option.id ? "font-bold" : "font-medium")}>{option.label}</span>
-                </label>
-              ))}
-            </div>
-          </div>
+                  <div className="flex items-center gap-3">
+                    <div className="text-slate-600">
+                      <MessageCircle className="w-5 h-5" />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[15px] font-medium text-slate-900">Comments</span>
+                      <span className="text-[13px] text-slate-500 capitalize">
+                        {allowComments ? 'Allowed' : 'Disabled'}
+                      </span>
+                    </div>
+                  </div>
+                  <ChevronRight className={cn("w-5 h-5 text-slate-400 transition-transform", showCommentDropdown && "rotate-90")} />
+                </div>
+                <AnimatePresence>
+                  {showCommentDropdown && (
+                    <motion.div 
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      className="overflow-hidden bg-slate-50 rounded-xl"
+                    >
+                      {[
+                        { id: true, label: 'Allow Everyone', desc: 'Anyone can comment' },
+                        { id: false, label: 'No One', desc: 'Nobody can comment' }
+                      ].map((v) => (
+                        <div 
+                          key={String(v.id)}
+                          onClick={() => { setAllowComments(v.id); setShowCommentDropdown(false); }}
+                          className={cn(
+                            "flex flex-col p-4 border-b border-white/50 active:bg-slate-200 transition-all",
+                            allowComments === v.id ? "text-primary bg-primary/5" : "text-slate-600"
+                          )}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-sm font-bold">{v.label}</span>
+                            {allowComments === v.id && <Check className="w-4 h-4" />}
+                          </div>
+                          <span className="text-[11px] opacity-70">{v.desc}</span>
+                        </div>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
-          {/* Comment Toggle */}
-          <div className="flex items-center justify-between py-1 px-1">
-            <div className="flex flex-col">
-              <span className="text-sm font-bold text-slate-800">Allow Comments</span>
-              <span className="text-[10px] text-slate-500">Let others share their thoughts</span>
-            </div>
-            <button 
-              onClick={() => setAllowComments(!allowComments)}
-              disabled={uploading}
-              className={cn(
-                "w-11 h-6 rounded-full transition-all relative",
-                allowComments ? "bg-primary shadow-[0_0_8px_rgba(20,184,166,0.4)]" : "bg-slate-300"
-              )}
-            >
-              <div className={cn(
-                "absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-sm",
-                allowComments ? "left-6" : "left-1"
-              )} />
-            </button>
-          </div>
-        </div>
-
-        {/* Upload Status Card */}
-        {uploading && (
-          <div className="bg-slate-50 p-5 rounded-xl border border-primary/20 animate-pulse">
-            <div className="flex justify-between text-[11px] font-black mb-3 text-primary uppercase tracking-widest">
-              <span className="flex items-center gap-2">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                Processing video...
-              </span>
-              <span>{progress}%</span>
-            </div>
-            <div className="w-full bg-slate-200 rounded-full h-2 overflow-hidden">
-              <div 
-                className="bg-primary h-full rounded-full transition-all duration-300" 
-                style={{ width: `${progress}%` }}
-              ></div>
+              {/* Info Row */}
+              <div className="mt-4 p-4 bg-slate-50 rounded-lg flex items-start gap-3">
+                <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center text-amber-600 flex-shrink-0 mt-0.5">
+                  <span className="text-[10px] font-bold">!</span>
+                </div>
+                <p className="text-[11px] text-slate-500 leading-relaxed font-medium">
+                  By posting, you agree to our Community Guidelines. Please ensure your content is Islamic and respectful.
+                </p>
+              </div>
             </div>
           </div>
         )}
+
+        {/* Fullscreen Video Preview Overlay */}
+        <AnimatePresence>
+          {showFullscreenPreview && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="fixed inset-0 bg-black z-[3000] flex flex-col"
+            >
+              <div className="absolute top-0 inset-x-0 p-4 pt-safe flex items-center justify-between z-10 bg-gradient-to-b from-black/60 to-transparent">
+                <button 
+                  onClick={() => setShowFullscreenPreview(false)}
+                  className="p-2 text-white active:scale-90 transition-all"
+                >
+                  <ChevronLeft className="w-8 h-8" />
+                </button>
+                <span className="text-white font-bold text-lg">Preview</span>
+                <div className="w-10" />
+              </div>
+              
+              <video 
+                src={previewUrl} 
+                className="w-full h-full object-contain" 
+                playsInline
+                autoPlay
+                controls
+                loop
+              />
+              
+              <div className="absolute bottom-10 inset-x-0 px-6 flex gap-4">
+                <button 
+                  onClick={() => setShowFullscreenPreview(false)}
+                  className="flex-1 py-4 bg-white/20 backdrop-blur-md text-white rounded-lg font-bold border border-white/30"
+                >
+                  Close
+                </button>
+                <button 
+                  onClick={() => setShowFullscreenPreview(false)}
+                  className="flex-1 py-4 bg-primary text-white rounded-lg font-bold shadow-lg shadow-primary/20"
+                >
+                  Save View
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
+
+      {/* Footer */}
+      {previewUrl && (
+        <div className="p-4 border-t border-slate-100 bg-white pb-safe-bottom">
+          {uploading ? (
+            <div className="flex flex-col gap-3">
+              <div className="h-12 bg-slate-100 rounded-lg overflow-hidden relative">
+                <motion.div 
+                  className="absolute inset-y-0 left-0 bg-primary opacity-20"
+                  animate={{ width: `${progress}%` }}
+                />
+                <div className="absolute inset-0 flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                  <span className="text-sm font-bold text-primary">Posting... {progress}%</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-3">
+              <button 
+                onClick={onClose}
+                className="flex-1 py-3.5 bg-slate-100 text-slate-900 rounded-lg font-bold text-base active:scale-95 transition-all"
+              >
+                Drafts
+              </button>
+              <button 
+                onClick={handleUpload}
+                disabled={uploading || !file}
+                className="flex-[2] py-3.5 bg-primary text-white rounded-lg font-extrabold text-base shadow-lg shadow-primary/20 active:scale-95 transition-all disabled:opacity-50"
+              >
+                Post
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 };
@@ -1753,6 +2329,9 @@ export function Social() {
   const [activeFeedTab, setActiveFeedTab] = useState<'foryou' | 'following'>('foryou');
   const [activeIndex, setActiveIndex] = useState(0);
   const [showUpload, setShowUpload] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [initialUploadFile, setInitialUploadFile] = useState<File | undefined>(undefined);
   const [loading, setLoading] = useState(true);
   const [activeCommentVideo, setActiveCommentVideo] = useState<string | null>(null);
   const [activeMoreVideo, setActiveMoreVideo] = useState<any | null>(null);
@@ -1767,7 +2346,7 @@ export function Social() {
   const [watchedVideoIds, setWatchedVideoIds] = useState<Set<string>>(new Set());
   const [lastAdIndex, setLastAdIndex] = useState(0);
   const [isAdShowing, setIsAdShowing] = useState(false);
-  const [isMuted, setIsMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
 
   // Show Interstitial Ad every 5 videos
   useEffect(() => {
@@ -1899,12 +2478,24 @@ export function Social() {
     
     if (isAnyPopupOpen) {
       window.dispatchEvent(new CustomEvent('nav-theme', { detail: 'white' }));
+      if (Capacitor.isNativePlatform()) {
+        StatusBar.setStyle({ style: Style.Light }).catch(() => {});
+        StatusBar.setBackgroundColor({ color: '#ffffff' }).catch(() => {});
+      }
     } else {
       window.dispatchEvent(new CustomEvent('nav-theme', { detail: 'default' }));
+      if (Capacitor.isNativePlatform()) {
+        StatusBar.setStyle({ style: Style.Dark }).catch(() => {});
+        StatusBar.setBackgroundColor({ color: '#000000' }).catch(() => {});
+      }
     }
 
     return () => {
       window.dispatchEvent(new CustomEvent('nav-theme', { detail: 'default' }));
+      if (Capacitor.isNativePlatform()) {
+        StatusBar.setStyle({ style: Style.Light }).catch(() => {});
+        StatusBar.setBackgroundColor({ color: '#ffffff' }).catch(() => {});
+      }
     };
   }, [showUpload, activeProfileUserId, activeMoreVideo, activeCommentVideo, activeEditVideo, showDeleteConfirm, showReport]);
 
@@ -1996,9 +2587,13 @@ export function Social() {
                 allowComments: data.allowComments !== false, // Default to true
                 visibility: data.visibility || 'public',
                 songName: data.songName || 'Original Sound',
+                status: data.status,
                 createdAt: data.createdAt // Keep for sorting
               };
             });
+
+            // Filter by status (approved only) and visibility
+            fetchedVideos = fetchedVideos.filter(v => v.status === 'approved' || !v.status); // Default to approved if status missing for old videos
 
             // In-memory filter for visibility to avoid index requirement
             if (activeFeedTab === 'foryou') {
@@ -2063,7 +2658,7 @@ export function Social() {
   return (
     <div className="h-[calc(100vh-64px)] md:h-screen w-full bg-black relative flex flex-col overflow-hidden">
       {/* Header Overlay */}
-      <div className="absolute top-0 left-0 right-0 z-50 pt-safe mt-2 md:mt-4 px-4 flex items-center justify-between pointer-events-none">
+      <div className="absolute top-0 left-0 right-0 z-50 pt-safe mt-1 md:mt-2 px-4 flex items-center justify-between pointer-events-none">
         <button 
           onClick={() => {
             const user = auth.currentUser;
@@ -2094,22 +2689,59 @@ export function Social() {
             For You
           </button>
         </div>
-        <button 
-          onClick={() => {
-            if (!auth.currentUser) {
-              alert('You must be logged in to upload a video.');
-              return;
-            }
-            setShowUpload(true);
-          }}
-          className="w-9 h-9 flex items-center justify-center pointer-events-auto active:scale-95 transition-all"
-        >
-          <Camera className="w-6 h-6 text-white drop-shadow-lg" />
-        </button>
+        <div className="flex gap-3 pointer-events-auto items-center">
+          <button 
+            onClick={() => {
+              if (!auth.currentUser) {
+                alert('You must be logged in to create!');
+                return;
+              }
+              setShowCamera(true);
+            }}
+            className="w-9 h-9 flex items-center justify-center active:scale-95 transition-all"
+          >
+            <Camera className="w-6 h-6 text-white drop-shadow-lg" />
+          </button>
+        </div>
       </div>
 
       <AnimatePresence>
-        {showUpload && <UploadModal key="upload-modal" onClose={() => setShowUpload(false)} />}
+        {showCamera && (
+          <CameraModal 
+            key="camera-modal" 
+            onClose={() => setShowCamera(false)}
+            onCapture={(file) => {
+              setInitialUploadFile(file);
+              setShowCamera(false);
+              setShowEdit(true);
+            }} 
+          />
+        )}
+        {showEdit && initialUploadFile && (
+          <VideoEditModal 
+            key="edit-trim-modal"
+            file={initialUploadFile}
+            onClose={() => {
+              setShowEdit(false);
+              setShowCamera(true); // Go back to camera
+            }}
+            onComplete={(trimmedFile) => {
+              setInitialUploadFile(trimmedFile);
+              setShowEdit(false);
+              setShowUpload(true);
+            }}
+          />
+        )}
+        {showUpload && (
+          <UploadModal 
+            key="upload-modal" 
+            initialFile={initialUploadFile} 
+            onClose={() => {
+              setShowUpload(false);
+              setInitialUploadFile(undefined);
+            }} 
+          />
+        )}
         {activeCommentVideo && <CommentSheet key={`comments-${activeCommentVideo}`} videoId={activeCommentVideo} onClose={() => setActiveCommentVideo(null)} />}
         {activeMoreVideo && (
           <MoreOptionsSheet 
@@ -2196,7 +2828,7 @@ export function Social() {
                   <VideoPost 
                     video={video} 
                     isActive={activeIndex === index}
-                    isPaused={isAdShowing || showUpload || !!activeCommentVideo || !!activeMoreVideo || !!showReport || !!activeEditVideo || !!showDeleteConfirm || !!activeProfileUserId}
+                    isPaused={isAdShowing || showUpload || showCamera || showEdit || !!activeCommentVideo || !!activeMoreVideo || !!showReport || !!activeEditVideo || !!showDeleteConfirm || !!activeProfileUserId}
                     onCommentClick={() => setActiveCommentVideo(video.id)}
                     onMoreClick={() => setActiveMoreVideo(video)}
                     onAvatarClick={(uid) => setActiveProfileUserId(uid)}

@@ -226,6 +226,58 @@ async function startServer() {
     }
   });
 
+  // ========== TELEGRAM WEBHOOK ==========
+  app.post("/api/telegram/webhook", async (req, res) => {
+    try {
+      const { callback_query } = req.body;
+      if (!callback_query || !db) return res.sendStatus(200);
+
+      const { data, message } = callback_query;
+      const botToken = process.env.TELEGRAM_BOT_TOKEN || "8577168806:AAEvPksc7qHSYmr0wzE7DwHQeglzOUZZn5U";
+
+      if (data.startsWith('approve_')) {
+        const videoId = data.replace('approve_', '');
+        await db.collection('social_videos').doc(videoId).update({
+          status: 'approved',
+          updatedAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+
+        // Edit Telegram message to show approved status
+        const axios = (await import('axios')).default;
+        await axios.post(`https://api.telegram.org/bot${botToken}/editMessageCaption`, {
+          chat_id: message.chat.id,
+          message_id: message.message_id,
+          caption: message.caption + "\n\n✅ Approved and Live!",
+          reply_markup: { inline_keyboard: [] } // Remove buttons
+        });
+      } 
+      else if (data.startsWith('reject_')) {
+        const videoId = data.replace('reject_', '');
+        await db.collection('social_videos').doc(videoId).delete();
+
+        // Edit Telegram message to show rejected status
+        const axios = (await import('axios')).default;
+        await axios.post(`https://api.telegram.org/bot${botToken}/editMessageCaption`, {
+          chat_id: message.chat.id,
+          message_id: message.message_id,
+          caption: message.caption + "\n\n❌ Rejected and Deleted.",
+          reply_markup: { inline_keyboard: [] } // Remove buttons
+        });
+      }
+
+      // Answer callback query to stop loading state in Telegram
+      const axios = (await import('axios')).default;
+      await axios.post(`https://api.telegram.org/bot${botToken}/answerCallbackQuery`, {
+        callback_query_id: callback_query.id
+      });
+
+      res.sendStatus(200);
+    } catch (error) {
+      console.error("Webhook Error:", error);
+      res.sendStatus(200); // Always send 200 to Telegram
+    }
+  });
+
   // ========== TELEGRAM VIDEO APIs ==========
   app.get("/api/videos/stream/:fileId", async (req, res) => {
     try {
@@ -405,8 +457,26 @@ async function startServer() {
     }
   });
 
-  app.listen(PORT as number, "0.0.0.0", () => {
+  app.listen(PORT as number, "0.0.0.0", async () => {
     console.log(`Server running on port ${PORT}`);
+    
+    // Auto-set Telegram Webhook
+    const botToken = process.env.TELEGRAM_BOT_TOKEN || "8577168806:AAEvPksc7qHSYmr0wzE7DwHQeglzOUZZn5U";
+    if (botToken && process.env.NODE_ENV === "production") {
+      try {
+        const axios = (await import('axios')).default;
+        // In AI Studio/Cloud Run, we need the public URL
+        // If we don't have it, we might skip, but let's try to use the host if available
+        // Normally users should provide WEBHOOK_URL in env
+        const webhookUrl = process.env.WEBHOOK_URL ? `${process.env.WEBHOOK_URL}/api/telegram/webhook` : null;
+        if (webhookUrl) {
+          await axios.get(`https://api.telegram.org/bot${botToken}/setWebhook?url=${webhookUrl}`);
+          console.log("Telegram Webhook set to:", webhookUrl);
+        }
+      } catch (err) {
+        console.error("Failed to set Telegram Webhook:", err);
+      }
+    }
   });
 }
 

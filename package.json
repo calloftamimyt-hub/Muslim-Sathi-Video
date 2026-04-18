@@ -48,6 +48,7 @@
     "firebase": "^12.10.0",
     "firebase-admin": "^13.7.0",
     "form-data": "^4.0.5",
+    "framer-motion": "^12.38.0",
     "hijri-date": "^0.2.2",
     "idb": "^8.0.3",
     "lucide-react": "^0.546.0",
